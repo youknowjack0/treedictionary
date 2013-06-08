@@ -132,24 +132,21 @@ namespace Langman.DataStructures
             throw new System.NotImplementedException();
         }
 
-        private bool Find(int from, TKey key, out Node node)
+        private int Find(int from, TKey key)
         {
             while (from != -1)
             {
                 Node n = _nodes[from];
-                int cmp = _comparer.Compare(key, n.Key);
+                int cmp = _comparer.Compare(key, _nodes[from].Key);
                 if (cmp == -1)
-                    from = n.Left;
+                    from = _nodes[from].Left;
                 else if (cmp == 1)
-                    from = n.Right;
+                    from = _nodes[from].Right;
                 else
-                {
-                    node = n;
-                    return true;
-                }
+                    return from;
             }
-            node = default(Node);
-            return false;
+
+            return -1;
         }
 
         public void Add(TKey key, TValue value)
@@ -326,10 +323,10 @@ namespace Langman.DataStructures
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private TValue Find(TKey key)
         {
-            Node n;
-            if(!Find(_root, key,out n))            
+            int index = Find(_root, key);
+            if (index == -1) 
                 throw new KeyNotFoundException();
-            return n.Value;
+            return _nodes[index].Value;
         }
 
         public TValue this[TKey key]
