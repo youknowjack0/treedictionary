@@ -2,6 +2,9 @@
 Copyright 2013 Jack Langman
 All rights reserved.
 
+Based on algorithms in  Cormen, Leiserson, Rivest & Stein, Introduction to 
+Algorithms Third edition (MIT Press, 2009)  
+
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met: 
 
@@ -70,6 +73,8 @@ namespace Langman.DataStructures
             {
                 Key = key;
                 Value = value;
+                Left = -1;
+                Right = -1;
             }
 
             public int Left;
@@ -127,10 +132,32 @@ namespace Langman.DataStructures
             throw new System.NotImplementedException();
         }
 
+        private bool Find(int from, TKey key, out Node node)
+        {
+            while (from != -1)
+            {
+                Node n = _nodes[from];
+                int cmp = _comparer.Compare(key, n.Key);
+                if (cmp == -1)
+                    from = n.Left;
+                else if (cmp == 1)
+                    from = n.Right;
+                else
+                {
+                    node = n;
+                    return true;
+                }
+            }
+            node = default(Node);
+            return false;
+        }
+
         public void Add(TKey key, TValue value)
         {
-            Node n = new Node(key, value);
+            Node n = new Node(key, value);            
+
             int next;
+            
             if (_freeSlotsCount != 0)
                 next = _freeSlots[--_freeSlotsCount];
             else
@@ -161,26 +188,124 @@ namespace Langman.DataStructures
             n.Parent = y;
 
             if (y == -1)
+            {
                 _root = next;
+                n.Color = Color.Black;
+                _nodes[next] = n;
+                return;
+            }
             else if (cmp == -1)
                 _nodes[y].Left = next;
             else
                 _nodes[y].Right = next;
 
-            n.Left = -1;
-            n.Right = -1;
-           
-            
-
-            Fixup(ref n);
             _nodes[next] = n;
+            Fixup(next);
+            
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void Fixup(ref Node node)
-        {            
-            for(int n = node.Parent; )
+        private void Fixup(int z)
+        {
+            int zp;
+            while ((zp = _nodes[z].Parent) != -1 && _nodes[zp].Color == Color.Red)
+            {
+                int zpp = _nodes[zp].Parent;
+                if (zp == _nodes[zpp].Left)
+                {
+                    int y = _nodes[zpp].Right;
+                    if (y != -1 && _nodes[y].Color == Color.Red)
+                    {
+                        _nodes[zp].Color = Color.Black;
+                        _nodes[y].Color = Color.Black;
+                        _nodes[zpp].Color = Color.Red;
+                        z = zpp;
+                    }
+                    else
+                    {
+                        if (z == _nodes[zp].Right)
+                        {
+                            z = zp;
+                            RotateLeft(z);
+                            zp = _nodes[z].Parent;
+                            zpp = _nodes[zp].Parent;
+                        }
+                        _nodes[zp].Color = Color.Black;
+                        _nodes[zpp].Color = Color.Red;
+                        RotateRight(zpp);
+                    }
+                }
+                else
+                {
+                    int y = _nodes[zpp].Left;
+                    if (y != -1 && _nodes[y].Color == Color.Red)
+                    {
+                        _nodes[zp].Color = Color.Black;
+                        _nodes[y].Color = Color.Black;
+                        _nodes[zpp].Color = Color.Red;
+                        z = zpp;
+                    }
+                    else
+                    {
+                        if (z == _nodes[zp].Left)
+                        {
+                            z = zp;
+                            RotateRight(z);
+                            zp = _nodes[z].Parent;
+                            zpp = _nodes[zp].Parent;
+                        }
+                        _nodes[zp].Color = Color.Black;
+                        _nodes[zpp].Color = Color.Red;
+                        RotateLeft(zpp);
+                    }
+                }
+            }
+            _nodes[_root].Color = Color.Black;
         }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void RotateRight(int x)
+        {
+            int y = _nodes[x].Left;
+            int yr;
+            _nodes[x].Left = (yr = _nodes[y].Right);
+            if (yr != -1)
+                _nodes[yr].Parent = x;
+            int xp;
+            _nodes[y].Parent = (xp = _nodes[x].Parent);
+            if (xp == -1)
+                _root = y;
+            else if (x == _nodes[xp].Right)
+                _nodes[xp].Right = y;
+            else
+                _nodes[xp].Left = y;
+
+            _nodes[y].Right = x;
+            _nodes[x].Parent = y;
+
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void RotateLeft(int x)
+        {
+            int y = _nodes[x].Right;
+            int yl;
+            _nodes[x].Right = (yl = _nodes[y].Left);
+            if (yl != -1)
+                _nodes[yl].Parent = x;
+            int xp;
+            _nodes[y].Parent = (xp = _nodes[x].Parent);
+            if (xp == -1)
+                _root = y;
+            else if (x == _nodes[xp].Left)
+                _nodes[xp].Left = y;
+            else
+                _nodes[xp].Right = y;
+
+            _nodes[y].Left = x;
+            _nodes[x].Parent = y;
+        }
+
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void Expand()
@@ -198,9 +323,18 @@ namespace Langman.DataStructures
             throw new System.NotImplementedException();
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private TValue Find(TKey key)
+        {
+            Node n;
+            if(!Find(_root, key,out n))            
+                throw new KeyNotFoundException();
+            return n.Value;
+        }
+
         public TValue this[TKey key]
         {
-            get { throw new System.NotImplementedException(); }
+            get { return Find(key); }
             set { throw new System.NotImplementedException(); }
         }
 
