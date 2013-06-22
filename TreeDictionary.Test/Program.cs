@@ -8,6 +8,7 @@ namespace Langman.DataStructures.Test
     {
         static void Main(string[] args)
         {
+            
 
             Dictionary<int, int> pairs = new Dictionary<int, int>();
             int total = 5000000;

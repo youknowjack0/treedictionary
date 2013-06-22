@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 
@@ -87,7 +88,7 @@ namespace Langman.DataStructures
 
         public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
         {
-            throw new System.NotImplementedException();
+            return new Enumerator(this);
         }
 
         IEnumerator IEnumerable.GetEnumerator()
@@ -132,73 +133,88 @@ namespace Langman.DataStructures
             throw new System.NotImplementedException();
         }
 
-        private int Find(int from, TKey key)
+        /// <summary>
+        /// returns 0 if found
+        /// 
+        /// when found, index will point to the found node
+        /// 
+        /// otherwise, index will point to the parent where the node could be created
+        /// and return will be -1 for left, 1 for right
+        /// </summary>        
+        private int Find(ref int index, TKey key)
         {
-            while (from != -1)
+            int last;
+            int cmp;
+            do
             {
-                Node n = _nodes[from];
-                int cmp = _comparer.Compare(key, _nodes[from].Key);
+                last = index;
+                cmp = _comparer.Compare(key, _nodes[index].Key);
                 if (cmp == -1)
-                    from = _nodes[from].Left;
+                    index = _nodes[index].Left;
                 else if (cmp == 1)
-                    from = _nodes[from].Right;
+                    index = _nodes[index].Right;
                 else
-                    return from;
-            }
+                    return 0;
+            } while (index != -1);
 
-            return -1;
+            index = last;
+            return cmp;
         }
 
-        public void Add(TKey key, TValue value)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <param name="index">-1 if the tree is empty, otherwise index of the parent</param>
+        /// <param name="side">-1 for left, 1 for right</param>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void Add(TKey key, TValue value, int index, int side)
         {
-            Node n = new Node(key, value);            
+            Node n = new Node(key, value);
 
             int next;
-            
+
             if (_freeSlotsCount != 0)
                 next = _freeSlots[--_freeSlotsCount];
             else
             {
                 if (_nodeCount == _nodes.Length)
-                {                        
+                {
                     Expand();
                 }
-                next = _nodeCount++;                                    
-            }
-            
-            //if(_comparer.Compare(key, key.))
-            int x = _root;
-            int y = -1;
-            int cmp = 0; //initialization not actually required
-            while (x != -1)
-            {
-                y = x;                    
-                cmp = _comparer.Compare(key, _nodes[x].Key);
-                if (cmp == -1)
-                    x = _nodes[x].Left;
-                else if (cmp == 1)
-                    x = _nodes[x].Right;
-                else
-                    throw new ArgumentException("An element with the same key already exists in the dictionary");
+                next = _nodeCount++;
             }
 
-            n.Parent = y;
+            n.Parent = index;
 
-            if (y == -1)
+            if (index == -1)
             {
                 _root = next;
                 n.Color = Color.Black;
                 _nodes[next] = n;
                 return;
             }
-            else if (cmp == -1)
-                _nodes[y].Left = next;
+            else if (side == -1)
+                _nodes[index].Left = next;
             else
-                _nodes[y].Right = next;
+                _nodes[index].Right = next;
 
             _nodes[next] = n;
             Fixup(next);
-            
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Add(TKey key, TValue value)
+        {
+            int index = _root;
+            int cmp;
+            if (_root == -1)
+                Add(key, value, -1, 0);
+            else if ((cmp = Find(ref index, key)) == 0)
+                throw new ArgumentException("An element with the same key already exists in the dictionary");
+            else
+                Add(key, value, index, cmp);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -323,8 +339,8 @@ namespace Langman.DataStructures
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private TValue Find(TKey key)
         {
-            int index = Find(_root, key);
-            if (index == -1) 
+            int index = _root;            
+            if (Find(ref index, key) != 0) 
                 throw new KeyNotFoundException();
             return _nodes[index].Value;
         }
@@ -332,10 +348,105 @@ namespace Langman.DataStructures
         public TValue this[TKey key]
         {
             get { return Find(key); }
-            set { throw new System.NotImplementedException(); }
+            set
+            {
+                int index = _root;
+                int cmp;
+                if ((cmp=Find(ref index, key)) == 0)
+                    _nodes[index].Value = value;
+                else
+                    Add(key, value, index, cmp); 
+            }
+        }
+
+        private void RemoveImpl(int index)
+        {
+            throw new NotImplementedException();
         }
 
         public ICollection<TKey> Keys { get; private set; }
         public ICollection<TValue> Values { get; private set; }
+
+        internal sealed class Enumerator : IEnumerator<KeyValuePair<TKey, TValue>>
+        {
+            private int _version; //todo
+            private TreeDictionary<TKey, TValue>_tree;
+
+            private int _index = -1;
+            private Node[] _nodes;
+            private int _direction;
+            //private int _direction;
+
+            public Enumerator(TreeDictionary<TKey, TValue> tree)
+            {
+                _tree = tree;
+                _index = tree._root;
+                _nodes = tree._nodes;
+            }
+
+            public void Dispose()
+            {
+                
+            }
+
+            public bool MoveNext()
+            {
+                if (_index == -1) return false;
+                int left;
+                int right;
+                int parent;
+
+                if (_direction == -1)
+                {
+                    if ((right = _nodes[_index].Right) != -1)
+                    {
+                        _index = right;
+                        _direction = 0;
+                    }
+                    else
+                        _direction = 1;
+                }
+
+                while (_direction == 1) 
+                {                    
+                    parent = _nodes[_index].Parent;
+                    if (parent == -1) 
+                        return false;
+                    if (_nodes[parent].Left == _index)
+                    {
+                        _direction = -1;
+                        _index = parent;
+                        return true;
+                    }                    
+                    _index = parent;
+                }
+
+                while ((left = _nodes[_index].Left) != -1)
+                    _index = left;
+
+                _direction = -1;
+
+                return true;
+            }
+
+            public void Reset()
+            {                
+                _index = _tree._root;
+            }
+
+            public KeyValuePair<TKey, TValue> Current { 
+                get
+                {
+                    if (_index == -1) throw new InvalidOperationException();
+                    else
+                        return new KeyValuePair<TKey, TValue>(_nodes[_index].Key, _nodes[_index].Value);
+                } 
+            }
+
+            object IEnumerator.Current
+            {
+                get { return Current; }
+            }
+        }
     }
 }

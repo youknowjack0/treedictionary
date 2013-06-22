@@ -38,6 +38,35 @@ namespace Langman.DataStructures.Test
 
         }
 
+        [Test]
+        public void InOrderWalk()
+        {
+            TreeDictionary<int, int> dict = new TreeDictionary<int, int>();
+            SortedDictionary<int, int> reference = new SortedDictionary<int, int>();
+
+            Random r = new Random();
+            for (int i = 0; i < 500; i++)
+            {
+                dict.Add(i, i);
+                reference.Add(i, i);
+            }
+
+            var eDict = dict.GetEnumerator();
+            var eReference = reference.GetEnumerator();
+
+            while (eReference.MoveNext())
+            {
+                bool next = eDict.MoveNext();
+                Assert.True(next);
+                Assert.True(eDict.Current.Key == eReference.Current.Key && eDict.Current.Value == eReference.Current.Value);
+            }
+
+            Assert.False(eDict.MoveNext());
+            Assert.False(eDict.MoveNext());
+            Assert.False(eDict.MoveNext());
+            
+        }
+
 
     }
 }
