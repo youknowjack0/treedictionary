@@ -49,6 +49,7 @@ namespace Langman.DataStructures.Test
                 Console.WriteLine("Iterate (in order) {0} items from System.Collections.Generic.SortedDictionary: {1}", total * enumerationPasses, sw.ElapsedMilliseconds);
                
             }
+            GC.Collect();
             {
                 C5.TreeDictionary<int, int> td = new C5.TreeDictionary<int, int>();
                 Stopwatch sw = new Stopwatch();
@@ -78,6 +79,7 @@ namespace Langman.DataStructures.Test
                 sw.Stop();
                 Console.WriteLine("Iterate (in order) {0} items from C5.TreeDictionary: {1}", total * enumerationPasses, sw.ElapsedMilliseconds);
             }
+            GC.Collect();
             {
                 TreeDictionary<int, int> td = new TreeDictionary<int, int>();
                 Stopwatch sw = new Stopwatch();

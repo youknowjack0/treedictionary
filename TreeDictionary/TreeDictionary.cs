@@ -46,13 +46,14 @@ namespace Langman.DataStructures
 
         private Node[] _nodes;
         private int _nodeCount = 0;
-        private int[] _freeSlots = new int[0];
+        private int[] _freeSlots = new int[InitSize];
         private int _freeSlotsCount = 0;
-        private int _nextFree = 0;
         private int _root = -1;
         private IComparer<TKey> _comparer;
 
-        public TreeDictionary(int initSize = 4, IComparer<TKey> comparer = null)
+        private const int InitSize = 4;
+
+        public TreeDictionary(int initSize = InitSize, IComparer<TKey> comparer = null)
         {
             if (comparer == null)
                 _comparer = Comparer<TKey>.Default;
@@ -108,17 +109,30 @@ namespace Langman.DataStructures
 
         public void Clear()
         {
-            throw new System.NotImplementedException();
+            _root = -1;
+            _nodes = new Node[InitSize];
+            _freeSlots = new int[0];
+            _freeSlotsCount = 0;
         }
 
         public bool Contains(KeyValuePair<TKey, TValue> item)
         {
-            throw new System.NotImplementedException();
+            int index = _root;
+            return Find(ref index, item.Key) == 0;
         }
+
 
         public void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex)
         {
-            throw new System.NotImplementedException();
+            if (array == null)
+                throw new ArgumentNullException("array");
+            else if (array.Length < this.Count + arrayIndex)
+                throw new ArgumentException("array not sufficient size");
+
+            foreach (var item in this)
+            {
+                array[arrayIndex++] = item;                
+            }
         }
 
         public bool Remove(KeyValuePair<TKey, TValue> item)
@@ -126,11 +140,12 @@ namespace Langman.DataStructures
             throw new System.NotImplementedException();
         }
 
-        public int Count { get; private set; }
-        public bool IsReadOnly { get; private set; }
+        public int Count { get { return _nodeCount; } }
+        public bool IsReadOnly { get { return false; } }
         public bool ContainsKey(TKey key)
         {
-            throw new System.NotImplementedException();
+            int index = _root;
+            return Find(ref index, key) == 0;
         }
 
         /// <summary>
@@ -328,12 +343,33 @@ namespace Langman.DataStructures
 
         public bool Remove(TKey key)
         {
-            throw new System.NotImplementedException();
+            int index = _root;
+            if (Find(ref index, key) == 0)
+            {
+                Delete(index);
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+            
         }
 
         public bool TryGetValue(TKey key, out TValue value)
         {
-            throw new System.NotImplementedException();
+            int index = _root;
+            if (Find(ref index, key) == 0)
+            {
+                value = _nodes[index].Value;
+                return true;
+            }
+            else
+            {
+                value = default(TValue);
+                return false;
+            }
+
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -344,6 +380,7 @@ namespace Langman.DataStructures
                 throw new KeyNotFoundException();
             return _nodes[index].Value;
         }
+
 
         public TValue this[TKey key]
         {
@@ -359,9 +396,151 @@ namespace Langman.DataStructures
             }
         }
 
-        private void RemoveImpl(int index)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void Delete(int z)
         {
-            throw new NotImplementedException();
+            int y = z;
+            Color yOriginalColor = _nodes[y].Color;
+            int zl;
+            int x;
+            int zr;
+            if ((zl = _nodes[z].Left) == -1)
+            {
+                x = _nodes[z].Right;
+                Transplant(z, x);
+            }
+            else if ((zr = _nodes[z].Right) == -1)
+            {
+                x = zl;
+                Transplant(z, x);
+            }
+            else
+            {
+                y = zr;
+                int n;
+                while ((n = _nodes[y].Left) != -1)
+                    y = n;
+                yOriginalColor = _nodes[y].Color;
+                x = _nodes[y].Right;
+                if (_nodes[y].Parent == z)
+                    _nodes[x].Parent = y;
+                else
+                    Transplant(y, x);
+
+                Transplant(z, y);
+
+                int yl;
+                _nodes[y].Left = zl;
+                _nodes[zl].Parent = y;
+                _nodes[y].Color = _nodes[z].Color;
+            }
+
+            if (yOriginalColor == Color.Black)
+                DeleteFixup(x);
+
+            if (_freeSlots.Length == _freeSlotsCount)
+            {
+                Array.Resize(ref _freeSlots, _freeSlots.Length*2);
+            }
+            _freeSlots[_freeSlotsCount++] = x;
+            _nodeCount--;
+        }
+
+        private void DeleteFixup(int x)
+        {
+            while (x != _root && _nodes[x].Color == Color.Black)
+            {
+                int xp;
+                if (x == _nodes[(xp = _nodes[x].Parent)].Left)
+                {
+                    int w = _nodes[xp].Right;
+                    if (_nodes[w].Color == Color.Red)
+                    {
+                        _nodes[w].Color = Color.Black;
+                        _nodes[xp].Color = Color.Red;
+                        RotateLeft(xp);
+                        w = _nodes[xp].Right;
+
+                    }
+                    Color wrc;
+                    int wl;
+                    if ((wrc = _nodes[_nodes[w].Right].Color) == Color.Black &&
+                        _nodes[_nodes[w].Left].Color == Color.Black)
+                    {
+                        _nodes[w].Color = Color.Red;
+                        x = xp;
+
+                    }
+                    else
+                    {
+                        if (wrc == Color.Black)
+                        {
+                            _nodes[_nodes[w].Left].Color = Color.Black;
+                            _nodes[w].Color = Color.Red;
+                            RotateRight(w);
+                            w = _nodes[xp].Right;
+                        }
+                        _nodes[w].Color = _nodes[xp].Color;
+                        _nodes[xp].Color = Color.Black;
+                        _nodes[_nodes[w].Right].Color = Color.Black;
+                        RotateLeft(xp);
+                        x = _root;
+                    }
+                }
+                else
+                {
+                    int w = _nodes[xp].Left;
+                    if (_nodes[w].Color == Color.Red)
+                    {
+                        _nodes[w].Color = Color.Black;
+                        _nodes[xp].Color = Color.Red;
+                        RotateRight(xp);
+                        w = _nodes[xp].Left;
+
+                    }
+                    Color wrc;
+                    int wl;
+                    if ((wrc = _nodes[_nodes[w].Left].Color) == Color.Black &&
+                        _nodes[_nodes[w].Right].Color == Color.Black)
+                    {
+                        _nodes[w].Color = Color.Red;
+                        x = xp;
+
+                    }
+                    else
+                    {
+                        if (wrc == Color.Black)
+                        {
+                            _nodes[_nodes[w].Right].Color = Color.Black;
+                            _nodes[w].Color = Color.Red;
+                            RotateLeft(w);
+                            w = _nodes[xp].Left;
+                        }
+                        _nodes[w].Color = _nodes[xp].Color;
+                        _nodes[xp].Color = Color.Black;
+                        _nodes[_nodes[w].Left].Color = Color.Black;
+                        RotateRight(xp);
+                        x = _root;
+                    }
+                }
+                
+            }
+            _nodes[x].Color = Color.Black;
+        }
+
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void Transplant(int u, int v)
+        {
+            int up;
+            if ((up = _nodes[u].Parent) == -1)
+                _root = v;
+            else if (_nodes[up].Left == u)
+                _nodes[up].Left = v;
+            else
+                _nodes[up].Right = v;
+
+            _nodes[v].Parent = up;
         }
 
         public ICollection<TKey> Keys { get; private set; }
