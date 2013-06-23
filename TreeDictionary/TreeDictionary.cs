@@ -404,6 +404,7 @@ namespace Langman.DataStructures
             int zl;
             int x;
             int zr;
+            int zp = _nodes[z].Parent;
             if ((zl = _nodes[z].Left) == -1)
             {
                 x = _nodes[z].Right;
@@ -422,7 +423,7 @@ namespace Langman.DataStructures
                     y = n;
                 yOriginalColor = _nodes[y].Color;
                 x = _nodes[y].Right;
-                if (_nodes[y].Parent == z)
+                if (_nodes[y].Parent == z && x != -1)
                     _nodes[x].Parent = y;
                 else
                     Transplant(y, x);
@@ -436,22 +437,40 @@ namespace Langman.DataStructures
             }
 
             if (yOriginalColor == Color.Black)
-                DeleteFixup(x);
+                DeleteFixup(x, x == -1 ?  zp: _nodes[x].Parent);
 
             if (_freeSlots.Length == _freeSlotsCount)
             {
                 Array.Resize(ref _freeSlots, _freeSlots.Length*2);
             }
-            _freeSlots[_freeSlotsCount++] = x;
+            _freeSlots[_freeSlotsCount++] = z;
             _nodeCount--;
         }
 
-        private void DeleteFixup(int x)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private Color GetColor(int index)
         {
-            while (x != _root && _nodes[x].Color == Color.Black)
+            return index == -1 ? Color.Red : _nodes[index].Color;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private int GetLeft(int index)
+        {
+            return _nodes[index].Left;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private int GetRight(int index)
+        {
+            return _nodes[index].Right;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void DeleteFixup(int x, int xp)
+        {
+            while (x != _root && (x == -1 || _nodes[x].Color == Color.Black))
             {
-                int xp;
-                if (x == _nodes[(xp = _nodes[x].Parent)].Left)
+                if (x == _nodes[xp].Left)
                 {
                     int w = _nodes[xp].Right;
                     if (_nodes[w].Color == Color.Red)
@@ -463,9 +482,8 @@ namespace Langman.DataStructures
 
                     }
                     Color wrc;
-                    int wl;
-                    if ((wrc = _nodes[_nodes[w].Right].Color) == Color.Black &&
-                        _nodes[_nodes[w].Left].Color == Color.Black)
+                    if ((wrc = GetColor(GetRight(w))) == Color.Black &&
+                        GetColor(GetLeft(w)) == Color.Black)
                     {
                         _nodes[w].Color = Color.Red;
                         x = xp;
@@ -475,14 +493,18 @@ namespace Langman.DataStructures
                     {
                         if (wrc == Color.Black)
                         {
-                            _nodes[_nodes[w].Left].Color = Color.Black;
+                            int wl;
+                            if ((wl = _nodes[w].Left) != -1)
+                                _nodes[wl].Color = Color.Black;
                             _nodes[w].Color = Color.Red;
                             RotateRight(w);
                             w = _nodes[xp].Right;
                         }
                         _nodes[w].Color = _nodes[xp].Color;
                         _nodes[xp].Color = Color.Black;
-                        _nodes[_nodes[w].Right].Color = Color.Black;
+                        int wr;
+                        if ((wr = _nodes[w].Right) != -1)
+                            _nodes[wr].Color = Color.Black;
                         RotateLeft(xp);
                         x = _root;
                     }
@@ -499,9 +521,8 @@ namespace Langman.DataStructures
 
                     }
                     Color wrc;
-                    int wl;
-                    if ((wrc = _nodes[_nodes[w].Left].Color) == Color.Black &&
-                        _nodes[_nodes[w].Right].Color == Color.Black)
+                    if ((wrc = GetColor(GetLeft(w))) == Color.Black &&
+                        GetColor(GetRight(w)) == Color.Black)
                     {
                         _nodes[w].Color = Color.Red;
                         x = xp;
@@ -511,14 +532,18 @@ namespace Langman.DataStructures
                     {
                         if (wrc == Color.Black)
                         {
-                            _nodes[_nodes[w].Right].Color = Color.Black;
+                            int wr;
+                            if ((wr = _nodes[w].Right) != -1)
+                                _nodes[wr].Color = Color.Black;
                             _nodes[w].Color = Color.Red;
                             RotateLeft(w);
                             w = _nodes[xp].Left;
                         }
                         _nodes[w].Color = _nodes[xp].Color;
                         _nodes[xp].Color = Color.Black;
-                        _nodes[_nodes[w].Left].Color = Color.Black;
+                        int wl;
+                        if((wl = _nodes[w].Left) != -1)
+                            _nodes[wl].Color = Color.Black;
                         RotateRight(xp);
                         x = _root;
                     }
@@ -540,7 +565,8 @@ namespace Langman.DataStructures
             else
                 _nodes[up].Right = v;
 
-            _nodes[v].Parent = up;
+            if(v != -1) 
+                _nodes[v].Parent = up;
         }
 
         public ICollection<TKey> Keys { get; private set; }
