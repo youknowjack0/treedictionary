@@ -7,7 +7,7 @@ The API is identical to the .NET SortedDictionary.
 
 State: Alpha (not complete, just basic insert/remove/query operations)
 
-Some quick performance comparisons:
+Some quick performance comparisons (n = 5,000,000)
 
 <table>
 <tr><th>Implementation</th><th>Insertion</th><th>Query</th><th>In-order Enumeration</th><th>Removal</th></tr>
