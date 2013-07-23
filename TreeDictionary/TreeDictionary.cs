@@ -50,6 +50,8 @@ namespace Langman.DataStructures
         private int _freeSlotsCount = 0;
         private int _root = -1;
         private IComparer<TKey> _comparer;
+        private int _sentinelParent = -1;
+
 
         private const int InitSize = 4;
 
@@ -61,6 +63,7 @@ namespace Langman.DataStructures
                 _comparer = comparer;
 
             _nodes = new Node[initSize];
+
         }
 
         private enum Color
@@ -85,6 +88,8 @@ namespace Langman.DataStructures
             public Color Color;
             public TKey Key;
             public TValue Value;
+            
+
         }
 
         public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
@@ -343,7 +348,9 @@ namespace Langman.DataStructures
 
         public bool Remove(TKey key)
         {
-            int index = _root;
+            if (_nodeCount == 0)
+                return false;
+            int index = _root;            
             if (Find(ref index, key) == 0)
             {
                 Delete(index);
@@ -397,6 +404,17 @@ namespace Langman.DataStructures
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SetParentSafe(int node, int newParent)
+        {
+            if (node != -1)
+            {
+                _nodes[node].Parent = newParent;
+                return;
+            }
+            _sentinelParent = newParent;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void Delete(int z)
         {
             int y = z;
@@ -423,21 +441,25 @@ namespace Langman.DataStructures
                     y = n;
                 yOriginalColor = _nodes[y].Color;
                 x = _nodes[y].Right;
-                if (_nodes[y].Parent == z && x != -1)
-                    _nodes[x].Parent = y;
+                if (_nodes[y].Parent == z)
+                    SetParentSafe(x, y);
                 else
+                {
                     Transplant(y, x);
-
+                    int yr;
+                    _nodes[y].Right = (yr = _nodes[z].Right);
+                    SetParentSafe(yr, y);
+                }
                 Transplant(z, y);
 
                 int yl;
-                _nodes[y].Left = zl;
-                _nodes[zl].Parent = y;
+                _nodes[y].Left = (zl = _nodes[z].Left);
+                SetParentSafe(zl, y);
                 _nodes[y].Color = _nodes[z].Color;
             }
 
             if (yOriginalColor == Color.Black)
-                DeleteFixup(x, x == -1 ?  zp: _nodes[x].Parent);
+                DeleteFixup(x);
 
             if (_freeSlots.Length == _freeSlotsCount)
             {
@@ -446,12 +468,22 @@ namespace Langman.DataStructures
             _freeSlots[_freeSlotsCount++] = z;
             _nodeCount--;
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private Color GetColor(int index)
+        /*
+        private void Delete(int index)
         {
-            return index == -1 ? Color.Red : _nodes[index].Color;
-        }
+            Node z = _nodes[index];
+            Color yOriginalColor = z.Color;
+            Node x;
+            if (z.Left == -1)
+            {
+                x = z.GetRight(this);
+                Transplant(x);
+            }
+            else if (z.Right == -1)
+            {
+                x = z.GetLeft(this);
+            }
+        }*/
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private int GetLeft(int index)
@@ -466,91 +498,122 @@ namespace Langman.DataStructures
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void DeleteFixup(int x, int xp)
+        private int GetParentSafe(int node)
         {
-            while (x != _root && (x == -1 || _nodes[x].Color == Color.Black))
+            if (node != -1)
+                return _nodes[node].Parent;
+            else
+                return _sentinelParent;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private Color GetColorSafe(int node)
+        {
+            if (node == -1)
+                return Color.Black;
+            else
+                return _nodes[node].Color;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void DeleteFixup(int x)
+        {
+            while (x != _root && GetColorSafe(x) == Color.Black)
             {
-                if (x == _nodes[xp].Left)
+                int xp = GetParentSafe(x);
+                if (x == GetLeft(xp))
                 {
-                    int w = _nodes[xp].Right;
-                    if (_nodes[w].Color == Color.Red)
+                    int w = GetRight(xp);
+                    if (GetColor(w) == Color.Red)
                     {
                         _nodes[w].Color = Color.Black;
                         _nodes[xp].Color = Color.Red;
                         RotateLeft(xp);
+                        xp = GetParentSafe(x);                        
                         w = _nodes[xp].Right;
-
                     }
                     Color wrc;
-                    if ((wrc = GetColor(GetRight(w))) == Color.Black &&
-                        GetColor(GetLeft(w)) == Color.Black)
+                    if ((wrc = GetColorSafe(GetRight(w))) == Color.Black &&
+                        GetColorSafe(GetLeft(w)) == Color.Black)
                     {
                         _nodes[w].Color = Color.Red;
                         x = xp;
-
                     }
                     else
                     {
                         if (wrc == Color.Black)
                         {
-                            int wl;
-                            if ((wl = _nodes[w].Left) != -1)
-                                _nodes[wl].Color = Color.Black;
-                            _nodes[w].Color = Color.Red;
+                            SetColorSafe(GetLeft(w), Color.Black);
+                            SetColor(w, Color.Red);
                             RotateRight(w);
+                            xp = GetParentSafe(x);
                             w = _nodes[xp].Right;
                         }
-                        _nodes[w].Color = _nodes[xp].Color;
-                        _nodes[xp].Color = Color.Black;
-                        int wr;
-                        if ((wr = _nodes[w].Right) != -1)
-                            _nodes[wr].Color = Color.Black;
+                        SetColor(w, _nodes[xp].Color);
+                        SetColor(xp, Color.Black);
+                        SetColorSafe(GetRight(w),Color.Black);
                         RotateLeft(xp);
                         x = _root;
                     }
                 }
                 else
                 {
-                    int w = _nodes[xp].Left;
-                    if (_nodes[w].Color == Color.Red)
+                    int w = GetLeft(xp);
+                    if (GetColor(w) == Color.Red)
                     {
                         _nodes[w].Color = Color.Black;
                         _nodes[xp].Color = Color.Red;
                         RotateRight(xp);
+                        xp = GetParentSafe(x);
                         w = _nodes[xp].Left;
-
                     }
                     Color wrc;
-                    if ((wrc = GetColor(GetLeft(w))) == Color.Black &&
-                        GetColor(GetRight(w)) == Color.Black)
+                    if ((wrc = GetColorSafe(GetLeft(w))) == Color.Black &&
+                        GetColorSafe(GetRight(w)) == Color.Black)
                     {
                         _nodes[w].Color = Color.Red;
                         x = xp;
-
                     }
                     else
                     {
                         if (wrc == Color.Black)
                         {
-                            int wr;
-                            if ((wr = _nodes[w].Right) != -1)
-                                _nodes[wr].Color = Color.Black;
-                            _nodes[w].Color = Color.Red;
+                            SetColorSafe(GetRight(w), Color.Black);
+                            SetColor(w, Color.Red);
                             RotateLeft(w);
+                            xp = GetParentSafe(x);
                             w = _nodes[xp].Left;
                         }
-                        _nodes[w].Color = _nodes[xp].Color;
-                        _nodes[xp].Color = Color.Black;
-                        int wl;
-                        if((wl = _nodes[w].Left) != -1)
-                            _nodes[wl].Color = Color.Black;
+                        SetColor(w, _nodes[xp].Color);
+                        SetColor(xp, Color.Black);
+                        SetColorSafe(GetLeft(w), Color.Black);
                         RotateRight(xp);
                         x = _root;
                     }
                 }
                 
             }
-            _nodes[x].Color = Color.Black;
+
+            SetColorSafe(x, Color.Black);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private Color GetColor(int node)
+        {
+            return _nodes[node].Color;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SetColor(int node, Color c)
+        {
+            _nodes[node].Color = c;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void SetColorSafe(int node, Color c)
+        {
+            if(node != -1)
+                _nodes[node].Color = c;
         }
 
 
@@ -565,8 +628,7 @@ namespace Langman.DataStructures
             else
                 _nodes[up].Right = v;
 
-            if(v != -1) 
-                _nodes[v].Parent = up;
+            SetParentSafe(v, up);
         }
 
         public ICollection<TKey> Keys { get; private set; }
