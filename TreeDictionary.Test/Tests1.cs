@@ -117,8 +117,7 @@ namespace Langman.DataStructures.Test
             {
                 int x = r.Next();
 
-                knownGood.Remove(x % 550);
-                mine.Remove(x%550);
+                Assert.True(knownGood.Remove(x%550) == mine.Remove(x%550));
                 
 
                 Assert.True(IsEqual(mine, knownGood));

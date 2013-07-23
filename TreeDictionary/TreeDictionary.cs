@@ -366,17 +366,18 @@ namespace Langman.DataStructures
         public bool TryGetValue(TKey key, out TValue value)
         {
             int index = _root;
+            if (_nodeCount == 0)
+            {
+                value = default(TValue);
+                return false;
+            }
             if (Find(ref index, key) == 0)
             {
                 value = _nodes[index].Value;
                 return true;
             }
-            else
-            {
-                value = default(TValue);
-                return false;
-            }
-
+            value = default(TValue);
+            return false;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
